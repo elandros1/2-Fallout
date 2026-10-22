@@ -1,0 +1,60 @@
+// SPDX-License-Identifier: MIT
+// 开源协议标识：MIT协议
+pragma solidity ^0.6.0;
+// 编译器版本声明：使用0.6.0及以上Solidity版本
+import "openzeppelin-contracts-06/math/SafeMath.sol";
+// 导入OpenZeppelin的SafeMath安全数学库，防止整数溢出
+
+contract Fallout {
+    // 合约定义：Fallout合约
+    using SafeMath for uint256;
+    // 为uint256类型挂载SafeMath安全计算方法
+
+    mapping(address => uint256) allocations;
+    // 映射变量：记录每个地址对应的分配金额
+    address payable public owner;
+    // 公开可支付地址变量：合约所有者
+
+    /* constructor */
+    function Fal1out() public payable {
+        // 函数：Fal1out（拼写错误，不会被识别为构造函数，任何人都可以调用）
+        owner = msg.sender;
+        // 将合约所有者赋值为当前调用者
+        allocations[owner] = msg.value;
+        // 记录当前调用者存入的ETH金额
+    }
+
+    modifier onlyOwner() {
+        // 权限修饰器：仅所有者可调用被修饰函数
+        require(msg.sender == owner, "caller is not the owner");
+        // 校验调用者是否为所有者，不满足则回滚并提示信息
+        _;
+        // 校验通过后，执行被修饰函数内部代码
+    }
+
+    function allocate() public payable {
+        // 公开可支付存款函数：用户存入ETH
+        allocations[msg.sender] = allocations[msg.sender].add(msg.value);
+        // 累加当前调用者的分配额度，使用SafeMath安全加法
+    }
+
+    function sendAllocation(address payable allocator) public {
+        // 转账函数：向指定地址转出其对应的分配额度
+        require(allocations[allocator] > 0);
+        // 校验该地址拥有的分配额度大于0
+        allocator.transfer(allocations[allocator]);
+        // 向该地址转账对应额度的ETH
+    }
+
+    function collectAllocations() public onlyOwner {
+        // 所有者提款函数：提取合约内全部ETH
+        msg.sender.transfer(address(this).balance);
+        // 将合约全部余额转账给调用者
+    }
+
+    function allocatorBalance(address allocator) public view returns (uint256) {
+        // 只读查询函数：查询指定地址的分配余额
+        return allocations[allocator];
+        // 返回该地址对应的分配金额
+    }
+}
