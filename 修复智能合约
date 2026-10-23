@@ -1,0 +1,85 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+/**
+ * @title Fallout (修复版)
+ * @dev 修复了低版本 Solidity 中因函数名拼写错误导致构造函数退化为公开函数的漏洞。
+ * 1. 升级 Solidity 版本至 0.8.x。
+ * 2. 使用标准的 `constructor` 关键字定义初始化函数。
+ */
+contract FalloutFixed {
+    // 状态变量：记录每个地址的存款/分配额度
+    mapping(address => uint256) private allocations;
+    
+    // 状态变量：合约所有者 (Slot 0)
+    address payable public owner;
+
+    // 事件：用于链上状态追踪
+    event Allocated(address indexed user, uint256 amount);
+    event AllocationSent(address indexed to, uint256 amount);
+    event Collected(address indexed owner, uint256 amount);
+
+    /**
+     * @notice 标准构造函数
+     * @dev 仅在合约部署（Init Code）阶段执行一次，物理上不会在运行时字节码（Runtime Bytecode）中保留跳转入口，
+     * 彻底避免了外部通过 4 字节函数选择器（Function Selector）篡改 Slot 0 owner 的物理可能性。
+     */
+    constructor() payable {
+        owner = payable(msg.sender);
+        if (msg.value > 0) {
+            allocations[owner] = msg.value;
+            emit Allocated(owner, msg.value);
+        }
+    }
+
+    /// @notice 仅允许合约所有者调用的修饰器
+    modifier onlyOwner() {
+        require(msg.sender == owner, "FalloutFixed: caller is not the owner");
+        _;
+    }
+
+    /// @notice 允许任何用户存入 ETH 并记录额度
+    function allocate() public payable {
+        require(msg.value > 0, "FalloutFixed: must send ETH to allocate");
+        
+        // Solidity 0.8.x 已内置算术溢出检查，无需使用 SafeMath
+        allocations[msg.sender] += msg.value;
+        emit Allocated(msg.sender, msg.value);
+    }
+
+    /// @notice 向指定地址转出其分配的额度
+    /// @param allocator 接收 ETH 的目标地址
+    function sendAllocation(address payable allocator) public {
+        uint256 amount = allocations[allocator];
+        require(amount > 0, "FalloutFixed: no allocation to send");
+
+        // 遵循 Check-Effects-Interactions (CEI) 模式，先清空状态防止重入
+        allocations[allocator] = 0;
+
+        (bool success, ) = allocator.call{value: amount}("");
+        require(success, "FalloutFixed: ETH transfer failed");
+
+        emit AllocationSent(allocator, amount);
+    }
+
+    /// @notice 仅管理员可调用，提现合约内的全部 ETH 余额
+    function collectAllocations() public onlyOwner {
+        uint256 balance = address(this).balance;
+        require(balance > 0, "FalloutFixed: no balance to collect");
+
+        (bool success, ) = owner.call{value: balance}("");
+        require(success, "FalloutFixed: ETH collection failed");
+
+        emit Collected(owner, balance);
+    }
+
+    /// @notice 查询指定地址的分配额度
+    function allocatorBalance(address allocator) public view returns (uint256) {
+        return allocations[allocator];
+    }
+
+    /// @notice 允许合约直接接收 ETH
+    receive() external payable {
+        allocate();
+    }
+}
